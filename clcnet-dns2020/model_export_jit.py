@@ -185,3 +185,25 @@ def complex_mul(a: Tensor, b: Tensor, out: Optional[Tensor] = None) -> Tensor:
     out[..., 1] = a[..., 0] * b[..., 1]  # im1
     out[..., 1] += a[..., 1] * b[..., 0]  # im2
     return out
+
+
+def export_jit_frame(model: CLCNetStep, export_file):
+    model.eval()
+    # Test forward path and generate intermediate dummy output
+    frame_size = model.n_fft.item()
+    dummy_frame = torch.empty((frame_size,), dtype=torch.float32).uniform_(-1, 1)
+    dummy_frame_out = torch.zeros_like(dummy_frame)
+    buf_norm, buf_rnn, buf_clc, buf_ola_wnorm = model.init_buffers()
+    buf_clc = model.fft_step(dummy_frame, buf_clc)
+    dummy_out, buf_norm, buf_rnn = model(buf_clc, buf_norm, buf_rnn)
+    buf_ola_wnorm = model.ifft_step(dummy_out, dummy_frame_out, buf_ola_wnorm)
+    traced_module = torch.jit.trace_module(
+        model,
+        inputs={
+            "forward": (buf_clc, buf_norm, buf_rnn),
+            "fft_step": (dummy_frame, buf_clc),
+            "ifft_step": (dummy_out, dummy_frame_out, buf_ola_wnorm),
+            "init_buffers": tuple(),
+        },
+    )
+    traced_module.save(export_file)

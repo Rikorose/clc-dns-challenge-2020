@@ -154,7 +154,7 @@ if __name__ == "__main__":
 
     if args.verbose:
         print(f"Processing audio files in folder {args.input_folder}")
-    files = glob.glob(args.input_folder + "*.wav")
+    files = glob.glob(os.path.join(args.input_folder, "*.wav"))
     map_location = "cpu"
     with Pool(
         args.num_workers,
